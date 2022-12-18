@@ -1,6 +1,8 @@
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Scanner;
-import java.util.Vector;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -22,11 +24,11 @@ public class t_1{
     }
     public static void covertInt2StrPrint(Integer num){
         String text = util.Int2Str(num);
-        util.strPrint(text);
+        util.pprint(text);
     }
     public static void covertStr2IntPrint(String text){
         Integer num = util.Str2Int(text);
-        util.intPrint(num);
+        util.pprint(num);
     }
 }
 class Animal{
@@ -39,10 +41,10 @@ class Animal{
         this.age = age;
     }
     public void printName(){
-        util.strPrint(this.name);
+        util.pprint(this.name);
     }
     public void printAge(){
-        util.intPrint(this.age);
+        util.pprint(this.age);
     }
     public void set(String name){
         this.setName(name);
@@ -64,7 +66,7 @@ class util{
     public static void intPrint(Integer num){
         System.out.println(num);
     }
-    public static void strPrint(String text){
+    public static <MSG> void pprint(MSG text){
         System.out.println(text);
     }
     public static String Int2Str(Integer num){
@@ -73,6 +75,16 @@ class util{
     public static Integer Str2Int(String text){
         return Integer.valueOf(text);
     }
+    public static String findText(String text, String target){
+        Pattern pattern = Pattern.compile(text);
+        Matcher matcher = pattern.matcher(target);
+        //noinspection ReassignedVariable
+        String result = null;
+        while (matcher.find()) {
+            result = matcher.group(1);
+            if (result != null) break;
+        }
+        return result;}
 }
 class t_filed{
     StringBuffer arr = new StringBuffer();
@@ -87,7 +99,7 @@ class t_filed{
     }
     public static void printStrBuffer(StringBuffer stringBuffer){
         String resultStringBuffer = stringBuffer.toString();
-        util.strPrint(resultStringBuffer);
+        util.pprint(resultStringBuffer);
     }
     public void bufferAppender(String string){
         arr.append(string);
@@ -98,59 +110,164 @@ class t_filed{
         bufferAppender(scanner.nextLine());
     }
 }
-class Scraper{
+class Scraper {
     Document soup = null;
     String url;
+
     public void setUrl(String url) {
         this.url = url;
     }
+
     public void getSoup() {
         try {
             this.soup = Jsoup.connect(url).get();
-        }
-         catch (IOException error){
+        } catch (IOException error) {
             error.printStackTrace();
             this.soup = null;
         }
     }
-    public Elements findByClass(String elem){
-        assert soup != null;
+
+    public Elements findByClass(String elem) {
+        assert (soup != null);
         return soup.getElementsByClass(elem);
+    }
+
+    public Elements selectElem(String toFind) {
+        assert (soup != null);
+        return soup.select(toFind);
     }
 }
 class GetMelon{
     Scraper scraper = new Scraper();
-    String url;
+    String url = null;
+    private String soupType;
+    String musicInfo = null;
+    String albumUrl = null;
+    String title = null;
+    public enum Tag {
+        Year,
+        Genre,
+        AlbumName,
+        Title,
+        TrackNum,
+        Artist,
+        AlbumArtist,
+        Lyrics,
+        AlbumCover
+    }
     public void setUrl(String url){
         this.url = url;
-        scraper.setUrl(url);
+        scraper.setUrl(this.url);
+    }
+    public void setAlbumUrl(String albumUrl){
+        this.albumUrl = albumUrl;
+    }
+    public void getMusicInfo(){
+        this.musicInfo = scraper.findByClass("list").get(0).text().replace("\n", "");
+        util.pprint(this.musicInfo);
+    }
+    public String findTextOnlySoup(String text){
+        Pattern pattern = Pattern.compile(text);
+        Matcher matcher = pattern.matcher(this.musicInfo);
+        //noinspection ReassignedVariable
+        String result = null;
+        while (matcher.find()) result = matcher.group(1);
+        return result;
+    }
+    public void getAlbumInfo(){
+        assert this.albumUrl != null;
+        scraper.setUrl(this.albumUrl);
         scraper.getSoup();
+        this.soupType = "album";
     }
-    public String getArtist(){
-        return scraper.findByClass("artist_name").get(0).text();
+    public String findText(String text, String target){
+        Pattern pattern = Pattern.compile(text);
+        Matcher matcher = pattern.matcher(target);
+        //noinspection ReassignedVariable
+        String result = null;
+        while (matcher.find()) {
+            result = matcher.group(1);
+            if (result != null) break;
+        }
+        return result;
     }
-    public String getTitle(){
-        return scraper.findByClass("song_name").get(0).text().replace("곡명 ", "");
-    }
-    public void getAlbumName(){
-        System.out.println(scraper.findByClass("list").get(0));
+    public String getTrackNum(){
+        if (!this.soupType.equals("album")) getAlbumInfo();
+        if (this.title == null) this.getTag(Tag.Title);
+        assert this.title != null;
+        Elements soup = scraper.findByClass("wrap_song_info");
+        ArrayList <String> titleInAlbum = new ArrayList<>();
+        //noinspection ReassignedVariable
+        String tempTitle;
+        for (int i = 0; i < soup.size(); i++){
+            if (i == 0) {
+                tempTitle = findText("\"disabled\">(.+?)</span>", soup.get(0).toString());}
+            else{
+            tempTitle = findText("href=\".+?\" title=\".+?\">(.+?)</a>", soup.get(i).toString());}
+            if (tempTitle.contains("&amp")){
+                tempTitle = tempTitle.replaceAll("&amp", "&");
+            }
+            if (tempTitle.contains("(Inst.)")){
+                continue;
+            }
+            titleInAlbum.add(tempTitle);
 
+        }
+        print.print(titleInAlbum);
+        print.print(titleInAlbum.indexOf(this.title));
+        return "";
+    }
+    public String getAlbumCoverImg(){
+        if (!this.soupType.equals("album")) getAlbumInfo();
+        //noinspection ReassignedVariable
+        String imgUrl = scraper.selectElem("meta[property=\"og:image\"]").toString();
+        imgUrl = util.findText("content=\"(.+?)\"", imgUrl);
+        try{
+            imgUrl = imgUrl.replace("500", "1000");}
+        catch (Exception exception){
+            //pass
+        }
+        return imgUrl;
+    }
+    public String getTag(Tag type){
+        if (scraper.soup == null) scraper.getSoup();
+        this.soupType = "music";
+        if (musicInfo == null) this.getMusicInfo();
+        switch (type){
+            case Year -> {return findTextOnlySoup("발매일 (.+?) 장르");}
+            case Genre -> {return findTextOnlySoup("장르 (.+?)$");}
+            case AlbumName -> {return findTextOnlySoup("앨범 (.+?) 발매일");}
+            case Title -> {this.title = scraper.findByClass("song_name").get(0).text().replace("곡명 ", "");
+                return this.title;}
+            case Artist, AlbumArtist -> {return scraper.findByClass("artist_name").get(0).text();}
+            case TrackNum -> {return getTrackNum();}
+            case Lyrics -> {
+
+            }
+            case AlbumCover -> {return getAlbumCoverImg();}
+        }
+        return null;
     }
 }
 class t_3 extends t_1{
     public static void main(String[] args) {
         GetMelon getMelon = new GetMelon();
-        String url = "https://www.melon.com/song/detail.htm?songId=34819463";
+        String url = "https://www.melon.com/song/detail.htm?songId=34819464";
+        String albumUrl = "https://www.melon.com/album/detail.htm?albumId=10903868";
         getMelon.setUrl(url);
+        getMelon.setAlbumUrl(albumUrl);
+        print.print(getMelon.getTag(GetMelon.Tag.AlbumName));
+        print.print(getMelon.getTag(GetMelon.Tag.Year));
+        print.print(getMelon.getTag(GetMelon.Tag.Genre));
+        print.print(getMelon.getTag(GetMelon.Tag.Title));
+        print.print(getMelon.getTag(GetMelon.Tag.Artist));
+        print.print(getMelon.getTag(GetMelon.Tag.TrackNum));
+        print.print(getMelon.getTag(GetMelon.Tag.AlbumCover));
 
-        String artist = getMelon.getArtist();
-        util.strPrint(artist);
-
-        String title = getMelon.getTitle();
-        util.strPrint(title);
-
-        getMelon.getAlbumName();
-//        String albumName = getMelon.getAlbumName();
-//        util.strPrint(albumName);
+    }
+}
+class print<MSG>{
+    public static <MSG> void print(MSG msg) {
+        System.out.println(msg);
     }
 }
