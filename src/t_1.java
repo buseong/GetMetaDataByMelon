@@ -6,6 +6,7 @@ import java.util.regex.Pattern;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 public class t_1{
@@ -136,6 +137,9 @@ class Scraper {
         assert (soup != null);
         return soup.select(toFind);
     }
+    public String selectInSoup(String text){
+        return soup.select(text).toString();
+    }
 }
 class GetMelon{
     Scraper scraper = new Scraper();
@@ -157,16 +161,17 @@ class GetMelon{
     }
     public void setUrl(String url){
         this.url = url;
-        scraper.setUrl(this.url);
+//        scraper.setUrl(this.url);
     }
     public void setAlbumUrl(String albumUrl){
         this.albumUrl = albumUrl;
     }
-    public void getMusicInfo(){
+    public void getMusicDetailInfo(){
         this.musicInfo = scraper.findByClass("list").get(0).text().replace("\n", "");
         util.pprint(this.musicInfo);
     }
     public String findTextOnlySoup(String text){
+        if (this.musicInfo == null) this.getMusicDetailInfo();
         Pattern pattern = Pattern.compile(text);
         Matcher matcher = pattern.matcher(this.musicInfo);
         //noinspection ReassignedVariable
@@ -179,6 +184,12 @@ class GetMelon{
         scraper.setUrl(this.albumUrl);
         scraper.getSoup();
         this.soupType = "album";
+    }
+    public void getMusicInfo(){
+        assert (this.url != null);
+        scraper.setUrl(this.url);
+        scraper.getSoup();
+        this.soupType = "music";
     }
     public String findText(String text, String target){
         Pattern pattern = Pattern.compile(text);
@@ -211,10 +222,10 @@ class GetMelon{
                 continue;
             }
             titleInAlbum.add(tempTitle);
-
         }
         print.print(titleInAlbum);
         print.print(titleInAlbum.indexOf(this.title));
+        print.print(titleInAlbum.size());
         return "";
     }
     public String getAlbumCoverImg(){
@@ -229,24 +240,35 @@ class GetMelon{
         }
         return imgUrl;
     }
+    public String getLyrics(){
+        if (!this.soupType.equals("music")) this.getMusicInfo();
+        Elements soup = scraper.soup.select(".lyric");
+        if (soup.size() == 0) {print.print("lyric not exist");
+        return "";}
+        soup.select("br").append("\\n");
+        return soup.text();
+    }
     public String getTag(Tag type){
-        if (scraper.soup == null) scraper.getSoup();
-        this.soupType = "music";
-        if (musicInfo == null) this.getMusicInfo();
+        if (scraper.soup == null) this.getMusicInfo();
         switch (type){
             case Year -> {return findTextOnlySoup("발매일 (.+?) 장르");}
-            case Genre -> {return findTextOnlySoup("장르 (.+?)$");}
+            case Genre -> {
+                if (this.musicInfo.contains("FLAC")) return findTextOnlySoup("장르 (.+?) FLAC");
+                else{return findTextOnlySoup("장르 (.+?)$");}}
             case AlbumName -> {return findTextOnlySoup("앨범 (.+?) 발매일");}
             case Title -> {this.title = scraper.findByClass("song_name").get(0).text().replace("곡명 ", "");
                 return this.title;}
             case Artist, AlbumArtist -> {return scraper.findByClass("artist_name").get(0).text();}
             case TrackNum -> {return getTrackNum();}
-            case Lyrics -> {
-
-            }
+            case Lyrics -> {return getLyrics();}
             case AlbumCover -> {return getAlbumCoverImg();}
         }
         return null;
+    }
+    public void getAlbumByTitleUrl(){
+        if (!this.soupType.equals("album")) this.getAlbumInfo();
+        assert (scraper.soup != null);
+
     }
 }
 class t_3 extends t_1{
@@ -263,6 +285,7 @@ class t_3 extends t_1{
         print.print(getMelon.getTag(GetMelon.Tag.Artist));
         print.print(getMelon.getTag(GetMelon.Tag.TrackNum));
         print.print(getMelon.getTag(GetMelon.Tag.AlbumCover));
+        print.print(getMelon.getTag(GetMelon.Tag.Lyrics));
 
     }
 }
