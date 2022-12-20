@@ -3,10 +3,11 @@ import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-class print1<MSG>{
+class print1 {
     public static <MSG> void print(MSG msg) {
         System.out.println(msg);
     }}
@@ -14,9 +15,9 @@ public class GetMelonInfo {
     public static void main(String[] args) {
         GetMelon1 getMelon1 = new GetMelon1();
         String url = "https://www.melon.com/song/detail.htm?songId=34819464";
-        String albumUrl = "https://www.melon.com/album/detail.htm?albumId=10903868";
+//        String albumUrl = "https://www.melon.com/album/detail.htm?albumId=10903868";
         getMelon1.setUrl(url);
-        getMelon1.setAlbumUrl(albumUrl);
+//        getMelon1.setAlbumUrl(albumUrl);
         print1.print(getMelon1.getTag(GetMelon1.Tag.AlbumName));
         print1.print(getMelon1.getTag(GetMelon1.Tag.Year));
         print1.print(getMelon1.getTag(GetMelon1.Tag.Genre));
@@ -47,7 +48,9 @@ class GetMelon1{
     String musicInfo = null;
     String albumUrl = null;
     String title = null;
-    private String adult_only = "19금";
+    String melonId = "https://www.melon.com/song/detail.htm?songId=";
+    String albumId = "https://www.melon.com/album/detail.htm?albumId=";
+    String adultOnly = "19금";
     public enum Tag {
         Year,
         Genre,
@@ -185,7 +188,9 @@ class GetMelon1{
                 return utils.findText("앨범 (.+?) 발매일", this.musicInfo);}
             case Title -> {
                 this.getMusicSoup();
-                return scraper.selectInSoup(".song_name").get(0).text().replace("곡명 ", "");}
+                this.title = scraper.selectInSoup(".song_name").get(0).text().replace("곡명 ", "");
+                if (this.title.contains(this.adultOnly)) this.title = this.title.replace(this.adultOnly, "").strip();
+                return this.title;}
             case TrackNum -> {
                 return this.getTrackNum();}
             case AlbumArtist, Artist -> {
@@ -207,7 +212,7 @@ class GetMelon1{
         this.musicInfo = scraper.selectInSoup(".list").get(0).text().replace("\n", "");}
     public void getAlbumSoup(){
         if (this.soupType.equals("album")) return;
-        assert (this.albumUrl != null);
+        if (this.albumUrl == null) this.albumUrl = this.getAlbumUrlByMusicUrl();
         scraper.setUrl(this.albumUrl);
         scraper.getSoup();
         this.soupType = "album";}
@@ -225,7 +230,28 @@ class GetMelon1{
         imgUrl = util.findText("content=\"(.+?)\"", imgUrl).replace("500", "1000");
         return imgUrl;}
     public String getTrackNum(){
-        return "미구현 메소드";}}
+        this.getAlbumSoup();
+        Elements soup = scraper.soup.select(".wrap_song_info");
+        assert (soup.size() != 0);
+        ArrayList <String> titleInMusic = new ArrayList<>();
+        //noinspection ReassignedVariable
+        String tempTitle;
+        for (int i = 0; i < soup.size(); i++){
+            if (i == 0) {
+                tempTitle = utils.findText("\"disabled\">(.+?)</span>", soup.get(0).toString());}
+            else{
+                tempTitle = utils.findText("href=\".+?\" title=\".+?\">(.+?)</a>", soup.get(i).toString());}
+            if (tempTitle.contains("&amp")){
+                tempTitle = tempTitle.replaceAll("&amp", "&");}
+            if (tempTitle.contains("(Inst.)")){
+                continue;}
+            titleInMusic.add(tempTitle);}
+        return String.join(", ", titleInMusic);}
+    public String getAlbumUrlByMusicUrl(){
+        this.getMusicSoup();
+        String soup = utils.findText("javascript:melon.link.goAlbumDetail\\(\\'(.+?)\\'\\)",
+                scraper.selectInSoup(".list").get(0).toString().replace("\n", ""));
+        return this.albumId + soup;}}
 class utils{
     public static String findText(String text, String target){
         Pattern pattern = Pattern.compile(text);
