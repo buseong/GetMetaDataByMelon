@@ -15,21 +15,21 @@ import java.util.regex.Pattern;
 
 public class GetMelonInfo {
     public static void main(String[] args) {
-        GetMelon getMelon1 = new GetMelon();
+        GetMelon getMelon = new GetMelon();
 //        String url = "https://www.melon.com/song/detail.htm?songId=34819464";
 //        String albumUrl = "https://www.melon.com/album/detail.htm?albumId=10903868";
         String url = "https://www.melon.com/song/detail.htm?songId=1017063";
-        getMelon1.setUrl(url);
-//        getMelon1.setAlbumUrl(albumUrl);
-        print.print(getMelon1.getTag(GetMelon.Tag.AlbumName));
-        print.print(getMelon1.getTag(GetMelon.Tag.Year));
-        print.print(getMelon1.getTag(GetMelon.Tag.Genre));
-        print.print(getMelon1.getTag(GetMelon.Tag.Title));
-        print.print(getMelon1.getTag(GetMelon.Tag.Artist));
-        print.print(getMelon1.getTag(GetMelon.Tag.TrackNum));
-        print.print(getMelon1.getTag(GetMelon.Tag.AlbumCover));
-        print.print(getMelon1.getTag(GetMelon.Tag.Lyrics));
-        print.print(getMelon1.getTag(GetMelon.Tag.AlbumArtist));
+        getMelon.setUrl(url);
+//        getMelon.setAlbumUrl(albumUrl);
+        print.print(getMelon.getTag(GetMelon.Tag.AlbumName));
+        print.print(getMelon.getTag(GetMelon.Tag.Year));
+        print.print(getMelon.getTag(GetMelon.Tag.Genre));
+        print.print(getMelon.getTag(GetMelon.Tag.Title));
+        print.print(getMelon.getTag(GetMelon.Tag.Artist));
+        print.print(getMelon.getTag(GetMelon.Tag.TrackNum));
+        print.print(getMelon.getTag(GetMelon.Tag.AlbumCover));
+        print.print(getMelon.getTag(GetMelon.Tag.Lyrics));
+        print.print(getMelon.getTag(GetMelon.Tag.AlbumArtist));
     }}
 
 class Scraper {
@@ -54,6 +54,7 @@ class GetMelon {
     private String musicInfo = null;
     final String melonId = "https://www.melon.com/song/detail.htm?songId=";
     final String albumId = "https://www.melon.com/album/detail.htm?albumId=";
+    final String searchBase = "https://www.melon.com/search/song/index.htm?q=";
     String adultOnly = "19금";
     String musicUrl = null;
     String albumUrl = null;
@@ -182,6 +183,20 @@ class GetMelon {
     public void saveTag3v1(){
 
     }
+
+    public void searchMelonId(String title, String artist){
+
+
+    }
+
+    public String makeMelonUrlByTitle(String title){
+        String url = null;
+        return url;
+    }
+
+    public String makeMelonUrlByTitleNArtist(String title, String artist){
+        return "";
+    }
 }
 
 class utils {
@@ -239,6 +254,7 @@ class SetTag{
     public String mp3Location = null;
     public tagType mp3Type = null;
     public HashMap<tagEnum, String> tag = new HashMap<>();
+    private byte[] albumImage = null;
     public enum tagEnum {
         Year,
         Genre,
@@ -296,39 +312,17 @@ class SetTag{
         id3v1Tag.setYear("///YYYY");
         id3v1Tag.setGenre(12);// valueOf Integer
         id3v1Tag.setComment("/// music or album comment");
-//        for ID3v2:[
-//        id3v1Tag.setLyrics("///music lyrics");
-//        id3v1Tag.setComposer("///composer");
-//        id3v1Tag.setPublisher("///publisher");
-//        id3v1Tag.setOriginalArtist("/// another music artist");
-//        id3v1Tag.setAlbumArtist("///music artist");
-//        id3v1Tag.setUrl("///melon music url");]
         this.mp3File.save(this.mp3Location);}
 
     public void setTAg3v2() throws IOException, NotSupportedException {
         ID3v2 id3v2Tag = mp3File.getId3v2Tag();
-//        id3v2Tag.setTrack("///track num");
-//        id3v2Tag.setArtist("///music artist");
-//        id3v2Tag.setTitle("///music title");
-//        id3v2Tag.setAlbum("///album name");
-//        id3v2Tag.setYear("///YYYY");
-//        id3v2Tag.setGenre(12);
-//        id3v2Tag.setComment("/// music or album comment");
-//        id3v2Tag.setLyrics("///music lyrics");
-//        id3v2Tag.setComposer("///composer");
-//        id3v2Tag.setPublisher("///publisher");
-//        id3v2Tag.setOriginalArtist("/// another music artist");
-//        id3v2Tag.setAlbumArtist("///music artist");
-//        id3v2Tag.setUrl("///melon music url");
-        byte[] b = new byte[2048];
         id3v2Tag.setAlbum(this.tag.get(tagEnum.AlbumName));
         id3v2Tag.setArtist(this.tag.get(tagEnum.Artist));
         id3v2Tag.setTrack(this.tag.get(tagEnum.TrackNum));
         id3v2Tag.setTitle(this.tag.get(tagEnum.Title));
         id3v2Tag.setLyrics(this.tag.get(tagEnum.Lyrics));
         id3v2Tag.setGenreDescription(this.tag.get(tagEnum.Genre));
-        id3v2Tag.setAlbumImage(b, "image/jpg");
-        id3v2Tag.setAlbum(this.tag.get(tagEnum.AlbumName));
-        id3v2Tag.setAlbum(this.tag.get(tagEnum.AlbumName));
+        id3v2Tag.setAlbumImage(this.albumImage, "image/jpg");
+        id3v2Tag.setAlbumArtist(this.tag.get(tagEnum.Artist));
         this.mp3File.save(this.mp3Location);}
 }
