@@ -8,19 +8,24 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.nio.charset.StandardCharsets;
+import java.io.UnsupportedEncodingException;
 
 public class GetMelonInfo {
     public static void main(String[] args) {
         GetMelon getMelon = new GetMelon();
-//        String url = "https://www.melon.com/song/detail.htm?songId=34819464";
-//        String albumUrl = "https://www.melon.com/album/detail.htm?albumId=10903868";
-        String url = "https://www.melon.com/song/detail.htm?songId=1017063";
-        getMelon.setUrl(url);
-//        getMelon.setAlbumUrl(albumUrl);
+        GetMelonId getMelonId = new GetMelonId();
+
+        String title = "After like";
+        String artist = "ive";
+
+        getMelon.setMusicId(getMelonId.searchMelonId(title, artist));
+
         print.print(getMelon.getTag(GetMelon.Tag.AlbumName));
         print.print(getMelon.getTag(GetMelon.Tag.Year));
         print.print(getMelon.getTag(GetMelon.Tag.Genre));
@@ -52,9 +57,8 @@ class GetMelon {
     private final Scraper scraper = new Scraper();
     private String soupType = "";
     private String musicInfo = null;
-    final String melonId = "https://www.melon.com/song/detail.htm?songId=";
+//    final String melonId = "https://www.melon.com/song/detail.htm?songId=";
     final String albumId = "https://www.melon.com/album/detail.htm?albumId=";
-    final String searchBase = "https://www.melon.com/search/song/index.htm?q=";
     String adultOnly = "19금";
     String musicUrl = null;
     String albumUrl = null;
@@ -73,8 +77,9 @@ class GetMelon {
     public void setUrl(String url){
         this.musicUrl = url;}
 
-    public void setAlbumUrl(String albumUrl){
-        this.albumUrl = albumUrl;}
+    public void setMusicId(String musicId){
+        this.musicUrl = "https://www.melon.com/song/detail.htm?songId=" + musicId;
+    }
 
     public String getTag(Tag tag){
         switch (tag){
@@ -144,14 +149,16 @@ class GetMelon {
         String imgUrl = utils.findText("content=\"(.+?)\"",
                 scraper.selectInSoup("meta[property=\"og:image\"]").get(0).toString());
         try{
-            utils.saveImage(imgUrl.replace("500", "1000"), saveLocation);}
+            imgUrl = imgUrl.replace("500", "1000");
+            utils.saveImage(imgUrl, saveLocation);}
         catch (IOException e1){
             try {
                 utils.saveImage(imgUrl, saveLocation);
             } catch (IOException e2) {
                 print.print("didn't get image");}
         }
-        return imgUrl;}
+        return imgUrl;
+    }
 
     public String getTrackNum(){
         this.getAlbumSoup();
@@ -160,16 +167,19 @@ class GetMelon {
         ArrayList <String> titleInMusic = new ArrayList<>();
         //noinspection ReassignedVariable
         String tempTitle;
-        for (int i = 0; i < soup.size(); i++){
+        for (org.jsoup.nodes.Element element : soup) {
             {
 //            if (i == 0) {
 //                tempTitle = utils.findText("\"disabled\">(.+?)</span>", soup.get(0).toString());}
 //            else{
-            tempTitle = utils.findText("href=\".+?\" title=\".+?\">(.+?)</a>", soup.get(i).toString());}
-            if (tempTitle.contains("&amp")){
-                tempTitle = tempTitle.replaceAll("&amp", "&");}
+                tempTitle = utils.findText("href=\".+?\" title=\".+?\">(.+?)</a>", element.toString());
+            }
+            if (tempTitle.contains("&amp")) {
+                tempTitle = tempTitle.replaceAll("&amp", "&");
+            }
 //            if (tempTitle.contains("(Inst.)")) continue;
-            titleInMusic.add(tempTitle);}
+            titleInMusic.add(tempTitle);
+        }
         return String.join(", ", titleInMusic);}
 
     public String getAlbumUrlByMusicUrl(){
@@ -177,26 +187,98 @@ class GetMelon {
         String soup = utils.findText("javascript:melon.link.goAlbumDetail\\(\\'(.+?)\\'\\)",
                 scraper.selectInSoup(".list").get(0).toString().replace("\n", ""));
         return this.albumId + soup;}
-    public void saveTAg(){
+
+    public void saveTag(){
 
     }
     public void saveTag3v1(){
 
     }
+}
 
-    public void searchMelonId(String title, String artist){
 
+class GetMelonId{
+    final String searchBase = "https://www.melon.com/search/song/index.htm?q=";
 
+    public static String quote(String value) {
+        try {
+            return URLEncoder.encode(value, StandardCharsets.UTF_8.toString());
+        } catch (UnsupportedEncodingException ex) {
+            throw new RuntimeException(ex.getCause());
+        }
     }
 
     public String makeMelonUrlByTitle(String title){
-        String url = null;
-        return url;
+        return this.searchBase + quote(title);
     }
 
     public String makeMelonUrlByTitleNArtist(String title, String artist){
-        return "";
+        return this.searchBase + quote(title) + "+" + quote(artist);
     }
+
+    public String removeBlank(String text){
+        return text.replace(" ", "");
+    }
+
+    public String getMelonId(String url, String title){
+
+        title = removeBlank(title);
+
+        Scraper scraper1 = new Scraper();
+        scraper1.setUrl(url);
+        scraper1.getSoup();
+        Elements soup = scraper1.selectInSoup(".fc_gray");
+
+        String musicId;
+
+        ArrayList<String> musicIdAL = new ArrayList<>();
+        ArrayList<String> titleAL = new ArrayList<>();
+        ArrayList<String> musicIdTempAL = new ArrayList<>();
+
+        for (org.jsoup.nodes.Element element : soup) {
+            musicIdAL.add(utils.findText("melon.play.playSong\\(\\'.+?\\',(.+?)\\);", element.toString()));
+        }
+
+        for (org.jsoup.nodes.Element element : soup) {
+            titleAL.add(removeBlank(utils.findText("title=\"(.+?)\">", element.toString())));
+        }
+
+        print.print(musicIdAL);
+        print.print(titleAL);
+
+        for (int i=0; i<titleAL.size(); i++){
+            if (titleAL.get(i).equals(title)){
+                musicIdTempAL.add(musicIdAL.get(i));
+            }
+        }
+
+        if (musicIdTempAL.isEmpty()){
+            for (int i=0; i<titleAL.size(); i++){
+                if (titleAL.get(i).toLowerCase().contains(title.toLowerCase()) ||
+                title.toLowerCase().contains(titleAL.get(i).toLowerCase())){
+                    musicIdTempAL.add(musicIdAL.get(i));
+                }
+            }
+        }
+
+        if (musicIdTempAL.isEmpty()){
+            musicId = musicIdAL.get(0);
+        } else{
+            musicId = musicIdTempAL.get(0);
+        }
+        return musicId;
+    }
+
+    public String searchMelonId(String title, String artist){
+        String url;
+        if (artist.isEmpty()){
+            url = makeMelonUrlByTitle(title);
+        } else{
+            url = makeMelonUrlByTitleNArtist(title, artist);
+        }
+        return getMelonId(url, title);
+    }
+
 }
 
 class utils {
@@ -215,7 +297,7 @@ class utils {
         InputStream is = url.openStream();
         OutputStream os = new FileOutputStream(destinationFile);
 
-        byte[] b = new byte[2048];
+        byte[] b = new byte[2048];  // resolution 2^*(1, 2, 3...)
         //noinspection ReassignedVariable
         int length;
 
@@ -225,28 +307,9 @@ class utils {
         os.close();
     }}
 
-class GetMelonMusicId{
-    String title;
-    String artist;
-    String music;
-
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
-    public void setArtist(String artist) {
-        this.artist = artist;
-    }
-
-    public String getMelonId(){
-        return "";
-    }
-}
-
 class print{
     public static <MSG> void print(MSG msg){
         System.out.println(msg);}
-
 }
 
 class SetTag{
