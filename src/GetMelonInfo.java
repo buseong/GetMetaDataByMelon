@@ -14,10 +14,10 @@ import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.nio.charset.StandardCharsets;
-import java.io.UnsupportedEncodingException;
 
 public class GetMelonInfo {
     public static void main(String[] args) {
+
         GetMelon getMelon = new GetMelon();
         GetMelonId getMelonId = new GetMelonId();
 
@@ -26,15 +26,7 @@ public class GetMelonInfo {
 
         getMelon.setMusicId(getMelonId.searchMelonId(title, artist));
 
-        print.print(getMelon.getTag(GetMelon.Tag.AlbumName));
-        print.print(getMelon.getTag(GetMelon.Tag.Year));
-        print.print(getMelon.getTag(GetMelon.Tag.Genre));
-        print.print(getMelon.getTag(GetMelon.Tag.Title));
-        print.print(getMelon.getTag(GetMelon.Tag.Artist));
-        print.print(getMelon.getTag(GetMelon.Tag.TrackNum));
-        print.print(getMelon.getTag(GetMelon.Tag.AlbumCover));
-        print.print(getMelon.getTag(GetMelon.Tag.Lyrics));
-        print.print(getMelon.getTag(GetMelon.Tag.AlbumArtist));
+        print.print(getMelon.getAllTAg());
     }}
 
 class Scraper {
@@ -59,10 +51,15 @@ class GetMelon {
     private String musicInfo = null;
 //    final String melonId = "https://www.melon.com/song/detail.htm?songId=";
     final String albumId = "https://www.melon.com/album/detail.htm?albumId=";
-    String adultOnly = "19금";
+
+    String adultOnly = "19금";  // maybe changed by local address-location??
     String musicUrl = null;
     String albumUrl = null;
-    String title = null;
+
+    @SuppressWarnings("rawtypes")
+    HashMap<Enum, String> musicTagEnum = new HashMap<>();
+    HashMap<String, String> musicTag = new HashMap<>();
+
     public enum Tag {
         Year,
         Genre,
@@ -72,7 +69,8 @@ class GetMelon {
         Artist,
         AlbumArtist,
         Lyrics,
-        AlbumCover}
+        AlbumCoverURl
+    }
 
     public void setUrl(String url){
         this.musicUrl = url;}
@@ -81,71 +79,149 @@ class GetMelon {
         this.musicUrl = "https://www.melon.com/song/detail.htm?songId=" + musicId;
     }
 
+    @SuppressWarnings("rawtypes")
+    public HashMap<Enum, String> getAllTAg(){
+        Tag[] tags = Tag.values();
+        for (Tag tag: tags){
+            getTag(tag);
+        }
+        return this.musicTagEnum;
+    }
+
     public String getTag(Tag tag){
-        switch (tag){
+        switch (tag) {
             case Year -> {
                 this.getMusicInfoSoup();
-                return utils.findText("발매일 (.+?) 장르", this.musicInfo);}
+
+                String year = utils.findText("발매일 (.+?) 장르", this.musicInfo);
+
+                this.musicTag.put("year", year);
+                this.musicTagEnum.put(Tag.Year, year);
+
+                return year;
+            }
 
             case Genre -> {
                 this.getMusicInfoSoup();
+
                 String genre;
+
                 if (this.musicInfo.contains("FLAC")){genre = utils.findText("장르 (.+?) FLAC", this.musicInfo);}
                 else{genre = utils.findText("장르 (.+?)$", this.musicInfo);}
-                return genre;}
+
+                this.musicTag.put("genre", genre);
+                this.musicTagEnum.put(Tag.Genre, genre);
+
+                return genre;
+            }
 
             case AlbumName -> {
                 this.getMusicInfoSoup();
-                return utils.findText("앨범 (.+?) 발매일", this.musicInfo);}
+
+                String albumName = utils.findText("앨범 (.+?) 발매일", this.musicInfo);
+
+                this.musicTag.put("albumName", albumName);
+                this.musicTagEnum.put(Tag.AlbumName, albumName);
+
+                return albumName;
+            }
 
             case Title -> {
                 this.getMusicSoup();
-                this.title = scraper.selectInSoup(".song_name").get(0).text().replace("곡명 ", "");
-                if (this.title.contains(this.adultOnly)) this.title = this.title.replace(this.adultOnly, "").strip();
-                return this.title;}
+
+                @SuppressWarnings("ReassignedVariable")
+                String title = scraper.selectInSoup(".song_name").get(0).text().replace("곡명 ", "");
+                if (title.contains(this.adultOnly))title = title.replace(this.adultOnly, "").strip();
+
+                this.musicTag.put("title", title);
+                this.musicTagEnum.put(Tag.Title, title);
+
+                return title;}
 
             case TrackNum -> {
-                return this.getTrackNum();}
+                String trackNum = this.getTrackNum();
+
+                this.musicTag.put("trackNum", trackNum);
+                this.musicTagEnum.put(Tag.TrackNum, trackNum);
+
+                return trackNum;
+            }
 
             case AlbumArtist, Artist -> {
                 this.getMusicInfoSoup();
-                return scraper.selectInSoup(".artist_name").get(0).text();}
+                // artist, albumArtist 분리예정
+                String artist = scraper.selectInSoup(".artist_name").get(0).text();
+                this.musicTag.put("artist", artist);
+                this.musicTag.put("AlbumArtist", artist);
+                this.musicTagEnum.put(Tag.Artist, artist);
+                this.musicTagEnum.put(Tag.AlbumArtist, artist);
+
+                return artist;
+            }
 
             case Lyrics -> {
                 this.getMusicSoup();
+
+                String lyric;
                 Elements lyrics = scraper.selectInSoup(".lyric");
-                if (lyrics.size() == 0) return "";
-                lyrics.get(0).select("br").append("\\n");
-                return lyrics.text();}
 
-            case AlbumCover -> {
-                return this.getAlbumCoverUrl();}}
+                if (lyrics.size() == 0) {
+                    print.print("didn't get lyrics because that song has not lyrics or is adult-only");
+                    lyric = "";
+                } else {
+                    lyrics.get(0).select("br").append("\\n");
+                    lyric = lyrics.text();
+                }
 
-        return "didn't get tag";}
+                this.musicTag.put("lyrics", lyric);
+                this.musicTagEnum.put(Tag.Lyrics, lyric);
+
+                return lyric;
+            }
+
+            case AlbumCoverURl -> {
+                String albumCoverUrl = this.getAlbumCoverUrl();
+
+                this.musicTag.put("albumCoverURl", albumCoverUrl);
+                this.musicTagEnum.put(Tag.AlbumCoverURl, albumCoverUrl);
+
+                return albumCoverUrl;
+            }
+        }
+
+        return "didn't get tag";
+    }
 
     public void getMusicInfoSoup(){
         if (this.musicInfo != null) return;
         assert (this.musicUrl != null);
+
         this.getMusicSoup();
-        this.musicInfo = scraper.selectInSoup(".list").get(0).text().replace("\n", "");}
+        this.musicInfo = scraper.selectInSoup(".list").get(0).text().replace("\n", "");
+    }
 
     public void getAlbumSoup(){
         if (this.soupType.equals("album")) return;
         if (this.albumUrl == null) this.albumUrl = this.getAlbumUrlByMusicUrl();
+
         scraper.setUrl(this.albumUrl);
         scraper.getSoup();
-        this.soupType = "album";}
+        this.soupType = "album";
+    }
 
     public void getMusicSoup(){
-        if (this.soupType.equals("music")) return;
+        if (this.soupType.equals("music"))return;
         assert (this.musicUrl != null);
+
         scraper.setUrl(this.musicUrl);
         scraper.getSoup();
-        this.soupType = "music";}
+        this.soupType = "music";
+    }
 
+    @SuppressWarnings("ReassignedVariable")
     public String getAlbumCoverUrl(){
         this.getAlbumSoup();
-        String saveLocation = "src/test.jpg";
+        String saveLocation = String.format("src/%s.jpg", this.musicTagEnum.get(Tag.Title));
         String imgUrl = utils.findText("content=\"(.+?)\"",
                 scraper.selectInSoup("meta[property=\"og:image\"]").get(0).toString());
         try{
@@ -155,7 +231,7 @@ class GetMelon {
             try {
                 utils.saveImage(imgUrl, saveLocation);
             } catch (IOException e2) {
-                print.print("didn't get image");}
+                print.print("didn't get imageUrl");}
         }
         return imgUrl;
     }
@@ -169,15 +245,12 @@ class GetMelon {
         String tempTitle;
         for (org.jsoup.nodes.Element element : soup) {
             {
-//            if (i == 0) {
-//                tempTitle = utils.findText("\"disabled\">(.+?)</span>", soup.get(0).toString());}
-//            else{
                 tempTitle = utils.findText("href=\".+?\" title=\".+?\">(.+?)</a>", element.toString());
             }
             if (tempTitle.contains("&amp")) {
                 tempTitle = tempTitle.replaceAll("&amp", "&");
             }
-//            if (tempTitle.contains("(Inst.)")) continue;
+//            if (tempTitle.contains("(Inst.)")) continue; // inst.ver 제외
             titleInMusic.add(tempTitle);
         }
         return String.join(", ", titleInMusic);}
@@ -188,7 +261,9 @@ class GetMelon {
                 scraper.selectInSoup(".list").get(0).toString().replace("\n", ""));
         return this.albumId + soup;}
 
-    public void saveTag(){
+    public void saveTag(String location) throws InvalidDataException, UnsupportedTagException, IOException {
+        SetTag setTag = new SetTag();
+        setTag.setMp3Location(location);
 
     }
     public void saveTag3v1(){
@@ -200,12 +275,8 @@ class GetMelon {
 class GetMelonId{
     final String searchBase = "https://www.melon.com/search/song/index.htm?q=";
 
-    public static String quote(String value) {
-        try {
-            return URLEncoder.encode(value, StandardCharsets.UTF_8.toString());
-        } catch (UnsupportedEncodingException ex) {
-            throw new RuntimeException(ex.getCause());
-        }
+    public static String quote(String text) {
+        return URLEncoder.encode(text, StandardCharsets.UTF_8);
     }
 
     public String makeMelonUrlByTitle(String title){
@@ -213,6 +284,7 @@ class GetMelonId{
     }
 
     public String makeMelonUrlByTitleNArtist(String title, String artist){
+        if (artist.isEmpty())return makeMelonUrlByTitle(title);
         return this.searchBase + quote(title) + "+" + quote(artist);
     }
 
@@ -220,6 +292,7 @@ class GetMelonId{
         return text.replace(" ", "");
     }
 
+    @SuppressWarnings("ReassignedVariable")
     public String getMelonId(String url, String title){
 
         title = removeBlank(title);
@@ -232,30 +305,27 @@ class GetMelonId{
         String musicId;
 
         ArrayList<String> musicIdAL = new ArrayList<>();
-        ArrayList<String> titleAL = new ArrayList<>();
         ArrayList<String> musicIdTempAL = new ArrayList<>();
+        ArrayList<String> titleAL = new ArrayList<>();
 
         for (org.jsoup.nodes.Element element : soup) {
             musicIdAL.add(utils.findText("melon.play.playSong\\(\\'.+?\\',(.+?)\\);", element.toString()));
         }
 
         for (org.jsoup.nodes.Element element : soup) {
-            titleAL.add(removeBlank(utils.findText("title=\"(.+?)\">", element.toString())));
+            titleAL.add(utils.findText("title=\"(.+?)\">", element.toString()));
         }
 
-        print.print(musicIdAL);
-        print.print(titleAL);
-
         for (int i=0; i<titleAL.size(); i++){
-            if (titleAL.get(i).equals(title)){
+            if (removeBlank(titleAL.get(i)).equals(title)){
                 musicIdTempAL.add(musicIdAL.get(i));
             }
         }
 
         if (musicIdTempAL.isEmpty()){
             for (int i=0; i<titleAL.size(); i++){
-                if (titleAL.get(i).toLowerCase().contains(title.toLowerCase()) ||
-                title.toLowerCase().contains(titleAL.get(i).toLowerCase())){
+                if (removeBlank(titleAL.get(i)).toLowerCase().contains(title.toLowerCase()) ||
+                title.toLowerCase().contains(removeBlank(titleAL.get(i)).toLowerCase())){
                     musicIdTempAL.add(musicIdAL.get(i));
                 }
             }
@@ -278,7 +348,6 @@ class GetMelonId{
         }
         return getMelonId(url, title);
     }
-
 }
 
 class utils {
@@ -289,8 +358,10 @@ class utils {
         String result = null;
         while (matcher.find()) {
             result = matcher.group(1);
-            if (result != null) break;}
-        return result;}
+            if (result != null) break;
+        }
+        return result;
+    }
 
     public static void saveImage(String imageUrl, String destinationFile) throws IOException {
         URL url = new URL(imageUrl);
@@ -317,7 +388,8 @@ class SetTag{
     public String mp3Location = null;
     public tagType mp3Type = null;
     public HashMap<tagEnum, String> tag = new HashMap<>();
-    private byte[] albumImage = null;
+    private byte[] albumImage;
+
     public enum tagEnum {
         Year,
         Genre,
@@ -327,12 +399,13 @@ class SetTag{
         Artist,
         AlbumArtist,
         Lyrics,
-        AlbumCover
+        AlbumCover,
     }
+
     private enum tagType {
         ID3v1,
         ID3v2,
-        Custom
+        Custom,
     }
 
     public void setMp3Location(String mp3Location) throws InvalidDataException, UnsupportedTagException, IOException {
@@ -342,7 +415,7 @@ class SetTag{
             if (this.mp3Type != null) {
                 if (this.mp3File.hasId3v1Tag()){
                     this.mp3Type = tagType.ID3v1;
-                }else if (this.mp3File.hasId3v2Tag()) {
+                } else if (this.mp3File.hasId3v2Tag()) {
                     this.mp3Type = tagType.ID3v2;
                 } else if (this.mp3File.hasCustomTag()) {
                     this.mp3Type = tagType.Custom;
@@ -352,7 +425,8 @@ class SetTag{
                     this.mp3Type = tagType.ID3v2;
                 }
             }
-        }}
+        }
+    }
 
     public void setTag(tagEnum tag, String value){
         this.tag.put(tag, value);
@@ -360,24 +434,24 @@ class SetTag{
 
     public void saveTag() throws IOException, NotSupportedException {
         switch (this.mp3Type) {
-            case ID3v1 -> this.setTag3v1();
-            case ID3v2 -> this.setTAg3v2();
+            case ID3v1 -> this.saveTag3v1();
+            case ID3v2 -> this.saveTAg3v2();
             case Custom -> System.out.println("don't support Custom Tag");
             default -> System.out.println("didn't set Tag in mp3-file");
         }}
 
-    public void setTag3v1() throws IOException, NotSupportedException {
+    public void saveTag3v1() throws IOException, NotSupportedException {
         ID3v1 id3v1Tag = mp3File.getId3v1Tag();
-        id3v1Tag.setTrack("///track num");
-        id3v1Tag.setArtist("///music artist");
-        id3v1Tag.setTitle("///music title");
-        id3v1Tag.setAlbum("///album name");
-        id3v1Tag.setYear("///YYYY");
-        id3v1Tag.setGenre(12);// valueOf Integer
-        id3v1Tag.setComment("/// music or album comment");
+        id3v1Tag.setTrack(this.tag.get(tagEnum.TrackNum));
+        id3v1Tag.setArtist(this.tag.get(tagEnum.Artist));
+        id3v1Tag.setTitle(this.tag.get(tagEnum.Title));
+        id3v1Tag.setAlbum(this.tag.get(tagEnum.AlbumName));
+        id3v1Tag.setYear("///YYYY"); // only year
+        id3v1Tag.setGenre(12);// value of Integer to change string(genre) to integer
+        id3v1Tag.setComment("/// music or album comment"); // music-detail??
         this.mp3File.save(this.mp3Location);}
 
-    public void setTAg3v2() throws IOException, NotSupportedException {
+    public void saveTAg3v2() throws IOException, NotSupportedException {
         ID3v2 id3v2Tag = mp3File.getId3v2Tag();
         id3v2Tag.setAlbum(this.tag.get(tagEnum.AlbumName));
         id3v2Tag.setArtist(this.tag.get(tagEnum.Artist));
